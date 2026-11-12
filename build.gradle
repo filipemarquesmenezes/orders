@@ -1,0 +1,90 @@
+plugins {
+	id 'java'
+	id 'jacoco'
+	id 'org.springframework.boot' version '4.1.2'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'com.google.protobuf' version '0.9.6'
+}
+
+group = 'com.system'
+version = '1.0'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(27)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-grpc-server'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'com.google.protobuf:protobuf-java-util'
+	runtimeOnly 'com.h2database:h2'
+	compileOnly 'org.projectlombok:lombok'
+//	developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+	annotationProcessor 'org.projectlombok:lombok'
+	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+	testImplementation 'org.springframework.boot:spring-boot-starter-grpc-server-test'
+	testCompileOnly 'org.projectlombok:lombok'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+protobuf {
+	plugins {
+		grpc {
+			artifact = 'io.grpc:protoc-gen-grpc-java:1.84.1'
+		}
+	}
+	generateProtoTasks {
+		all().configureEach {
+			plugins {
+				grpc {}
+			}
+		}
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	finalizedBy tasks.named('jacocoTestReport')
+}
+
+
+// Proto Java files are created during generateProto, so defer this discovery until
+// JaCoCo resolves its inputs. This keeps the exclusion correct after a clean build.
+def handwrittenClassDirectories = providers.provider {
+	def generatedSourcesRoot = layout.buildDirectory.dir('generated/sources/proto/main').get().asFile
+	// A generated Foo.java produces Foo.class and nested Foo$*.class files. Match
+	// only those forms so a handwritten class such as FooService remains covered.
+	// The protobuf plugin creates one source root per generator (for example,
+	// "java" and "grpc"). Paths must be relative to those roots to match classes.
+	def generatedClassPatterns = (generatedSourcesRoot.listFiles()?.findAll { it.directory } ?: [])
+				.collectMany { generatedSourceRoot ->
+					fileTree(generatedSourceRoot).matching { include '**/*.java' }.files.collectMany { sourceFile ->
+						def classPath = generatedSourceRoot.toPath().relativize(sourceFile.toPath()).toString()
+								.replace('\\', '/')
+								.replaceFirst(/\.java$/, '')
+						[classPath + '.class', classPath + '$*.class']
+					}
+				}
+	// Retain only compiled classes that do not correspond to generated proto sources.
+	sourceSets.main.output.classesDirs.collect { classesDirectory ->
+		fileTree(dir: classesDirectory, exclude: generatedClassPatterns)
+	}
+}
+
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+	classDirectories.setFrom(handwrittenClassDirectories)
+	sourceDirectories.setFrom(files('src/main/java'))
+	reports {
+		xml.required = true
+		html.required = true
+		csv.required = false
+	}
+}

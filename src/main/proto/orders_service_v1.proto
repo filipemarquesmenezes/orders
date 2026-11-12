@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package com.system.orders.v1;
+
+option java_package = "com.system.orders.grpc";
+option java_outer_classname = "OrdersServiceV1";
+
+import "google/protobuf/timestamp.proto";
+
+// Orders service definition.
+service Orders {
+  // Creates an order for a user.
+  rpc CreateOrder (CreateOrderRequest) returns (Order) {}
+  // Returns one order by id.
+  rpc GetOrder (GetOrderRequest) returns (Order) {}
+  // Returns orders. A user id of 0 returns every order.
+  rpc ListOrders (ListOrdersRequest) returns (OrderListResponse) {}
+  // Moves an order to a new status.
+  rpc UpdateOrderStatus (UpdateOrderStatusRequest) returns (Order) {}
+  // Cancels an order.
+  rpc CancelOrder (CancelOrderRequest) returns (Order) {}
+}
+
+// Lifecycle of an order.
+enum OrderStatus {
+  // Status was not set.
+  ORDER_STATUS_UNSPECIFIED = 0;
+  // Order was accepted and is waiting to be fulfilled.
+  ORDER_STATUS_PENDING = 1;
+  // Order was confirmed.
+  ORDER_STATUS_CONFIRMED = 2;
+  // Order was handed to delivery.
+  ORDER_STATUS_SHIPPED = 3;
+  // Order reached the customer.
+  ORDER_STATUS_DELIVERED = 4;
+  // Order was cancelled.
+  ORDER_STATUS_CANCELLED = 5;
+}
+
+// One line on an order.
+message OrderItem {
+  // Product id.
+  int64 product_id = 1;
+  // Product name at the time of the order.
+  string product_name = 2;
+  // Number of units. Must be greater than zero.
+  int32 quantity = 3;
+  // Price of one unit in minor currency units.
+  int64 unit_price_cents = 4;
+}
+
+// A placed order.
+message Order {
+  // Order id.
+  int64 id = 1;
+  // User who placed the order.
+  int64 user_id = 2;
+  // Current lifecycle status.
+  OrderStatus status = 3;
+  // Lines on the order.
+  repeated OrderItem items = 4;
+  // Sum of line totals in minor currency units.
+  int64 total_cents = 5;
+  // ISO 4217 currency code, for example "USD".
+  string currency_code = 6;
+  // When the order was created.
+  google.protobuf.Timestamp created_at = 7;
+}
+
+// Request to create an order.
+message CreateOrderRequest {
+  // User who places the order.
+  int64 user_id = 1;
+  // Lines on the order. Must contain at least one item.
+  repeated OrderItem items = 2;
+  // ISO 4217 currency code, for example "USD".
+  string currency_code = 3;
+}
+
+// Request to fetch one order.
+message GetOrderRequest {
+  // Order id.
+  int64 id = 1;
+}
+
+// Request to list orders.
+message ListOrdersRequest {
+  // When set to a user id, only that user's orders are returned.
+  // Zero returns every order.
+  int64 user_id = 1;
+}
+
+// Orders returned by ListOrders.
+message OrderListResponse {
+  // Matching orders.
+  repeated Order orders = 1;
+}
+
+// Request to change an order's status.
+message UpdateOrderStatusRequest {
+  // Order id.
+  int64 id = 1;
+  // Status to apply.
+  OrderStatus status = 2;
+}
+
+// Request to cancel an order.
+message CancelOrderRequest {
+  // Order id.
+  int64 id = 1;
+}
