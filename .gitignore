@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# AWS Emulator files generated on each start
+.aws-emulator/9297/
